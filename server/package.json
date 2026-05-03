@@ -6,19 +6,32 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "worker:dev": "tsx watch src/worker.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "worker:start": "node dist/worker.js"
   },
   "dependencies": {
+    "amqplib": "^1.0.3",
+    "bcryptjs": "^3.0.3",
+    "connect-redis": "^9.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
-    "mongodb": "^6.17.0"
+    "express-session": "^1.19.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.17.0",
+    "redis": "^5.12.1",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
+    "@types/express-session": "^1.19.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.0.1",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }

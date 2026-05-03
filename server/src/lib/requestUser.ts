@@ -1,12 +1,10 @@
 import type { Request } from "express";
-import { badRequest } from "./httpErrors.js";
+import { unauthorized } from "./httpErrors.js";
 
 export function getRequestUserEmail(request: Request) {
-  const headerValue = request.header("x-user-email")?.trim().toLowerCase();
-
-  if (!headerValue) {
-    throw badRequest("Missing required header: x-user-email");
+  if (!request.user) {
+    throw unauthorized("Authentication is required");
   }
 
-  return headerValue;
+  return request.user.email;
 }

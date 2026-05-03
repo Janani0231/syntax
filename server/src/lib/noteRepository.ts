@@ -1,5 +1,12 @@
 import { ObjectId, type Collection } from "mongodb";
 import { getConnectedMongoDb } from "./mongo.js";
+import {
+  cacheNote,
+  cacheNoteList,
+  getCachedNote,
+  getCachedNoteList,
+  invalidateNoteCache,
+} from "./noteCache.js";
 import type { CreateNoteInput, Note, UpdateNoteInput } from "../types/note.js";
 
 interface NoteDocument {
@@ -28,13 +35,22 @@ function mapNote(document: StoredNoteDocument): Note {
 }
 
 export async function listNotes(userEmail: string) {
+  const cachedNotes = await getCachedNoteList(userEmail);
+
+  if (cachedNotes) {
+    return cachedNotes;
+  }
+
   const collection = await getNotesCollection();
   const documents = await collection
     .find({ ownerEmail: userEmail })
     .sort({ updatedAt: -1 })
     .toArray();
+  const notes = documents.map(mapNote);
 
-  return documents.map(mapNote);
+  await cacheNoteList(userEmail, notes);
+
+  return notes;
 }
 
 export async function findNoteById(userEmail: string, id: string) {
@@ -42,9 +58,24 @@ export async function findNoteById(userEmail: string, id: string) {
     return null;
   }
 
+  const cachedNote = await getCachedNote(userEmail, id);
+
+  if (cachedNote) {
+    return cachedNote;
+  }
+
   const collection = await getNotesCollection();
-  const document = await collection.findOne({ _id: new ObjectId(id), ownerEmail: userEmail });
-  return document ? mapNote(document) : null;
+  const document = await collection.findOne({
+    _id: new ObjectId(id),
+    ownerEmail: userEmail,
+  });
+  const note = document ? mapNote(document) : null;
+
+  if (note) {
+    await cacheNote(userEmail, note);
+  }
+
+  return note;
 }
 
 export async function createNote(userEmail: string, input: CreateNoteInput) {
@@ -59,14 +90,19 @@ export async function createNote(userEmail: string, input: CreateNoteInput) {
 
   const collection = await getNotesCollection();
   const result = await collection.insertOne(document);
+  const note = mapNote({ ...document, _id: result.insertedId });
 
-  return {
-    id: result.insertedId.toHexString(),
-    ...document,
-  };
+  await invalidateNoteCache(userEmail);
+  await cacheNote(userEmail, note);
+
+  return note;
 }
 
-export async function updateNote(userEmail: string, id: string, input: UpdateNoteInput) {
+export async function updateNote(
+  userEmail: string,
+  id: string,
+  input: UpdateNoteInput,
+) {
   if (!ObjectId.isValid(id)) {
     return null;
   }
@@ -90,7 +126,14 @@ export async function updateNote(userEmail: string, id: string, input: UpdateNot
     { returnDocument: "after" },
   );
 
-  return result ? mapNote(result) : null;
+  const note = result ? mapNote(result) : null;
+
+  if (note) {
+    await invalidateNoteCache(userEmail, id);
+    await cacheNote(userEmail, note);
+  }
+
+  return note;
 }
 
 export async function deleteNote(userEmail: string, id: string) {
@@ -99,6 +142,15 @@ export async function deleteNote(userEmail: string, id: string) {
   }
 
   const collection = await getNotesCollection();
-  const result = await collection.deleteOne({ _id: new ObjectId(id), ownerEmail: userEmail });
-  return result.deletedCount === 1;
+  const result = await collection.deleteOne({
+    _id: new ObjectId(id),
+    ownerEmail: userEmail,
+  });
+
+  if (result.deletedCount === 1) {
+    await invalidateNoteCache(userEmail, id);
+    return true;
+  }
+
+  return false;
 }

@@ -12,6 +12,14 @@ export function badRequest(message: string) {
   return new HttpError(message, 400);
 }
 
+export function unauthorized(message: string) {
+  return new HttpError(message, 401);
+}
+
+export function forbidden(message: string) {
+  return new HttpError(message, 403);
+}
+
 export function notFound(message: string) {
   return new HttpError(message, 404);
 }

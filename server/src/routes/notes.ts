@@ -13,6 +13,7 @@ import {
   listNotes,
   updateNote,
 } from "../lib/noteRepository.js";
+import { queueNoteCreatedEmail } from "../queues/notificationPublisher.js";
 
 const notesRouter = Router();
 
@@ -50,6 +51,11 @@ notesRouter.post(
     const userEmail = getRequestUserEmail(request);
     const input = validateCreateNoteInput(request.body);
     const note = await createNote(userEmail, input);
+    void queueNoteCreatedEmail({
+      userEmail,
+      noteId: note.id,
+      noteTitle: note.title,
+    });
     response.status(201).json({ note });
   }),
 );

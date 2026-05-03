@@ -5,6 +5,9 @@ Full-stack Syntax workspace built with:
 - React + Vite frontend
 - Express backend
 - MongoDB for notes
+- Redis-backed `connect.sid` sessions and note caching
+- RabbitMQ background queue for notification jobs
+- WebSocket-powered live workspace chat
 - File-based backend storage for uploaded assets
 
 ## Project Structure
@@ -25,6 +28,7 @@ syntax/
 
 - Landing page, login, and register screens
 - Dashboard connected to backend APIs
+- Live WebSocket chat for authenticated users
 - Rich-text editor with notes stored in MongoDB
 - File uploads stored by the backend
 - File and note listing/download from real server data
@@ -35,6 +39,7 @@ syntax/
 - Node.js LTS
 - npm
 - MongoDB
+- Redis optional but recommended for caching
 
 Check installed versions:
 
@@ -69,7 +74,76 @@ Backend env values:
 PORT=4000
 MONGODB_URI=mongodb://127.0.0.1:27017
 MONGODB_DB_NAME=syntax
+JWT_SECRET=replace-with-a-long-random-secret
+JWT_EXPIRES_IN=7d
+SESSION_SECRET=replace-with-another-long-random-secret
+SESSION_COOKIE_NAME=connect.sid
+SESSION_TTL_SECONDS=604800
+SESSION_COOKIE_SECURE=false
+CORS_ORIGIN=http://localhost:5173
+REDIS_URL=redis://127.0.0.1:6379
+REDIS_ENABLED=true
+NOTE_CACHE_TTL_SECONDS=60
+RABBITMQ_URL=amqp://localhost:5672
+RABBITMQ_ENABLED=true
+NOTIFICATION_QUEUE_NAME=syntax.notifications
 FILE_STORAGE_DIR=server/storage
+```
+
+## RabbitMQ Setup
+
+RabbitMQ is used for background notification jobs. The API queues jobs after registration and note creation, and the worker consumes them separately.
+
+For local development with Docker:
+
+```powershell
+docker run -d --name syntax-rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+RabbitMQ management UI:
+
+```text
+http://localhost:15672
+```
+
+Default login:
+
+```text
+guest / guest
+```
+
+Environment:
+
+```env
+RABBITMQ_URL=amqp://localhost:5672
+RABBITMQ_ENABLED=true
+NOTIFICATION_QUEUE_NAME=syntax.notifications
+```
+
+Run the worker in a separate terminal:
+
+```powershell
+npm run server:worker:dev
+```
+
+If RabbitMQ is not available, API requests still succeed and notification jobs are skipped with a warning.
+
+## Redis Setup
+
+Redis is used for server-side `connect.sid` sessions and optional caching for frequently accessed note list/detail data.
+
+For local development, run Redis on the default port and keep:
+
+```env
+REDIS_URL=redis://127.0.0.1:6379
+REDIS_ENABLED=true
+NOTE_CACHE_TTL_SECONDS=60
+```
+
+If Redis is not available, note caching falls back to MongoDB reads. For scalable session storage, keep Redis running. You can disable Redis usage during local troubleshooting with:
+
+```env
+REDIS_ENABLED=false
 ```
 
 ## MongoDB Setup
@@ -164,7 +238,11 @@ npm run server:start
 
 Backend routes:
 
+- WebSocket: `ws://localhost:4000/ws/chat?token=JWT_TOKEN`
 - `GET /api/health`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 - `GET /api/files`
 - `GET /api/files/:name`
 - `POST /api/files`
@@ -179,9 +257,11 @@ Backend routes:
 Notes:
 
 - File APIs use backend storage on disk.
-- Note APIs use MongoDB.
-- Frontend requests include `x-user-email`, so notes/files are scoped per logged-in email.
-- Current login/register is frontend-only and does not create a real backend auth session.
+- Note APIs use MongoDB and use Redis cache for repeated reads when enabled.
+- Registration and note creation publish notification jobs to RabbitMQ when enabled.
+- Authenticated users can exchange live chat messages through WebSockets.
+- Login/register creates a Redis-backed HTTP-only `connect.sid` session cookie.
+- Protected routes accept the Redis session first and fall back to `Authorization: Bearer <token>`.
 
 ## Troubleshooting
 
