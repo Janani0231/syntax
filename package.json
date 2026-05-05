@@ -14,7 +14,11 @@
     "server:build": "npm --prefix server run build",
     "server:start": "npm --prefix server run start",
     "server:worker:start": "npm --prefix server run worker:start",
-    "start:full": "npm run build:full && npm run server:start"
+    "start:full": "npm run build:full && npm run server:start",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:logs": "docker compose logs -f app worker",
+    "docker:down": "docker compose down"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",

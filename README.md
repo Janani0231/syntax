@@ -186,6 +186,63 @@ Install backend dependencies:
 npm --prefix server install
 ```
 
+## Docker Deployment
+
+The app is Dockerized with:
+
+- `Dockerfile` for the production React + Express app image
+- `docker-compose.yml` for the app, worker, MongoDB, Redis, and RabbitMQ
+- `.dockerignore` for smaller build contexts
+
+Build the image:
+
+```powershell
+npm run docker:build
+```
+
+Start the full stack:
+
+```powershell
+npm run docker:up
+```
+
+Open the app:
+
+```text
+http://localhost:4000
+```
+
+View API/worker logs:
+
+```powershell
+npm run docker:logs
+```
+
+Stop containers:
+
+```powershell
+npm run docker:down
+```
+
+RabbitMQ management UI:
+
+```text
+http://localhost:15672
+```
+
+Default RabbitMQ login:
+
+```text
+guest / guest
+```
+
+Notes:
+
+- Docker Compose uses internal service names like `mongo`, `redis`, and `rabbitmq`.
+- Uploaded files are persisted in the `syntax_uploads` Docker volume.
+- MongoDB, Redis, and RabbitMQ data are persisted in Docker volumes.
+- If you already have local containers using ports `4000`, `27017`, `6379`, `5672`, or `15672`, stop them before running Compose or change the published ports in `docker-compose.yml`.
+
 ## Run The Project
 
 Open two terminals in `D:\projects\syntax`.

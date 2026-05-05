@@ -1,0 +1,100 @@
+services:
+  app:
+    build:
+      context: .
+      target: production
+    image: syntax-app:latest
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB_NAME: syntax
+      JWT_SECRET: change-this-jwt-secret-for-local-docker
+      JWT_EXPIRES_IN: 7d
+      SESSION_SECRET: change-this-session-secret-for-local-docker
+      SESSION_COOKIE_NAME: connect.sid
+      SESSION_TTL_SECONDS: 604800
+      SESSION_COOKIE_SECURE: "false"
+      CORS_ORIGIN: http://localhost:4000
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+      NOTE_CACHE_TTL_SECONDS: 60
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_ENABLED: "true"
+      NOTIFICATION_QUEUE_NAME: syntax.notifications
+      FILE_STORAGE_DIR: /app/server/storage
+      FRONTEND_DIST_DIR: /app/dist
+    volumes:
+      - syntax_uploads:/app/server/storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    image: syntax-app:latest
+    restart: unless-stopped
+    command: ["npm", "--prefix", "server", "run", "worker:start"]
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      RABBITMQ_ENABLED: "true"
+      NOTIFICATION_QUEUE_NAME: syntax.notifications
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB_NAME: syntax
+    depends_on:
+      app:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo_data:
+  redis_data:
+  rabbitmq_data:
+  syntax_uploads:
